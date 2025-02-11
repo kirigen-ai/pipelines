@@ -188,7 +188,7 @@ At Kirigen, we're tackling one of AI's most critical challenges: making advanced
 2. Community-driven development creates better solutions faster
 3. Transparent tools lead to more reliable systems
 
-Our mission is to provide the foundational infrastructure that transforms experimental AI into dependable, cognitive-ai. By open sourcing Kirigen, we're making orchestration accessible to everyone, from individual developers to large organizations.
+Our mission is to provide foundational cognitive systems that transforms experimental AI into dependable, cognitive-ai. By open sourcing pipelines, we're making orchestration accessible to everyone, from individual developers to large organizations.
 
 <div align="center">
 
