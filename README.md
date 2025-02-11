@@ -10,22 +10,20 @@
 
 <br/>
 
-> ### ⚠️ Early Access Alpha Release
->
-> Pipelines is currently in active development. While core features are production-tested, we're rapidly adding new capabilities:
->
-> - Advanced provider management
-> - Extended metrics and monitoring
-> - Enhanced scaling capabilities
-> - New provider types
->
-> **[Join our developer community](https://kirigen.co/newsletter)** to:
-> - Get notified when v1.0 launches
-> - Access early feature previews
-> - Shape the future of cognitive orchestration
-> - Receive technical deep-dives
->
-> *Current Version: 0.1.0-alpha*
+### ⚠️ Early Access Alpha Release
+Pipelines is currently in active development. While core features are production-tested, we're rapidly adding new capabilities:
+Advanced provider management
+Extended metrics and monitoring
+Enhanced scaling capabilities
+New provider types
+
+**[Join our developer community](https://kirigen.co/newsletter)** to:
+Get notified when v1.0 launches
+Access early feature previews
+Shape the future of cognitive orchestration
+Receive technical deep-dives
+
+*Current Version: 0.1.0-alpha*
 
 **The engine that makes cognitive systems reliable.**
 
@@ -48,13 +46,15 @@ from kirigen.providers.imagination import SDXLProvider, FluxProvider
 
 # Create your processing pipeline
 pipeline = ImageProviderPipeline(
-    instances=1,              # Initial instances
-    max_instances=2,         # Scaling limit
-    scale_policy="memory",   # Scale on GPU usage
-    cooldown=900,           # Scaling cooldown
+    instances=1,                    # start with 1
+    scale_policy="never",           # scale on concurrency
+    scale_to_zero=False,            # disable to_zero scaling, leaving this pipeline always active
     providers=[
-        SDXLProvider(),     # Base generation
-        FluxProvider()      # Enhancement
+        kp.ConcurrentQueue(
+            queue=4,
+            provider=SDXLProvider(),                                                # Generation
+            streams=[ kp.LoadBalancingQueue(2, 'round-robin', FluxProvider()) ]  # Enhancement (using load balancing)
+        ),
     ]
 )
 
@@ -67,29 +67,7 @@ async for request_id, result in pipeline.process_requests():
     print(f"└─ Total: {metrics.total_processing_time}ms")
 ```
 
-## Three Things That Matter
-
-### 🎯 Real Orchestration
-```python
-class ImageProviderPipeline:
-    def __init__(
-        self,
-        instances: int,          # Initial count
-        max_instances: int,      # Scale limit
-        scale_policy: str,       # How to scale
-        cooldown: int,          # Scale cooldown
-        providers: List[Provider] # AI models
-    ):
-        # Set up observable pipeline
-        self.request_metrics = {}
-        self._queue = asyncio.Queue()
-        
-        # Configure providers
-        self.sdxl = next(p for p in providers 
-                        if isinstance(p, SDXLProvider))
-        self.flux = [p for p in providers 
-                    if isinstance(p, FluxProvider)]
-```
+## Things That Matter
 
 ### 📊 Complete Observability
 ```python
@@ -102,34 +80,16 @@ class PipelineRequestMetrics:
     
     def complete(self):
         self.total_processing_time = time.time() - self.start_time
-```
 
-### ⚡ Production Architecture
-```python
-async def process_requests(self):
-    while True:
-        if not self._queue.empty():
-            # Get next request
-            request_id, request = await self._queue.get()
-            metrics = self.request_metrics[request_id]
-            
-            try:
-                # Track queue time
-                metrics.queue_time = time.time() - metrics.start_time
-                
-                # Process request
-                start = time.time()
-                result = await self._process(request)
-                metrics.provider_processing_time = time.time() - start
-                
-                # Complete metrics
-                metrics.complete()
-                yield request_id, result
-                
-            except Exception as e:
-                print(f"Failed to process {request_id}: {e}")
-                
-        await asyncio.sleep(0.1)  # Prevent CPU spin
+@dataclass
+class ImagePipelineRequestMetrics(PipelineRequestMetrics):
+    num_steps: int              # number of steps in the pipeline
+    image_format: str           # format of the image
+    image_size: tuple           # size of the image
+    image_orientation: str      # orientation of the image
+    image_aspect_ratio: float   # aspect ratio of the image
+    provider_name: str          # name of the provider
+    metadata: dict[str, str]    # image metadata
 ```
 
 ## Ready-to-Use Pipelines
@@ -138,23 +98,39 @@ async def process_requests(self):
 ```python
 # Create speech pipeline
 pipeline = AudioProviderPipeline(
-    instances=2,                    # Start with 2
-    max_instances=4,               # Scale to 4
-    scale_policy="concurrent",     # Scale on load
-    cooldown=300,                 # 5-min cooldown
+    instances=2,                    # start with 2
+    max_instances=12,               # scale to 12
+    cooldown=300,                   # 5-min cooldown
+    device="cuda:0",                # specify the device to load this pipeline on
+    scale_policy="concurrent",      # scale on concurrency
+    scale_to_zero=True,             # enable to_zero scaling, completely disabling this pipeline during low used
+    enable_realtime=True,           # enable real-time streaming of audio in- and out    
+    enable_telemetry=True,          # collect usage data and metrics to help improve your services
     providers=[
-        WhisperProvider(),        # Recognition
-        KokoroProvider()         # Synthesis
+        kp.ConcurrentQueue(queue=4, provider=KokoroProvider(), streams=None),  # Synthesis
+        kp.ConcurrentQueue(queue=4, provider=WhisperProvider(), streams=None), # Recognition
     ]
 )
 
-# Process with metrics
+# speech recognition request
 request_id = await pipeline.add_request(
-    SpeechRecognitionRequest(file="audio.mp3")
+    SpeechRecognitionRequest(file="voice-actor_take_001.wav")
 )
 
+# Monitor performance
 async for id, result in pipeline.process_requests():
-    if id == request_id:
+    if id == request_id:        
+        metrics = pipeline.request_metrics[id]
+        print(f"Time: {metrics.total_processing_time}ms")        
+
+# speech generation request
+request_id await pipeline.add_request(
+    SpeechGenerationRequest(text="Hello, world!")
+)
+
+# Monitor performance
+async for id, result in pipeline.process_requests():
+    if id == request_id:        
         metrics = pipeline.request_metrics[id]
         print(f"Time: {metrics.total_processing_time}ms")
 ```
@@ -163,13 +139,20 @@ async for id, result in pipeline.process_requests():
 ```python
 # Create image pipeline
 pipeline = ImageProviderPipeline(
-    instances=1,
-    max_instances=2,
-    scale_policy="memory",
-    cooldown=900,
+    instances=1,                    # start with 1
+    max_instances=1,                # never scale
+    cooldown=900,                   # 15-min cooldown
+    device="cuda:0",                # specify the device to load this pipeline on
+    scale_policy="never",           # scale on concurrency
+    scale_to_zero=False,            # disable to_zero scaling, leaving this pipeline always active
+    enable_realtime=False,          # disable real-time streaming
+    enable_telemetry=True,          # collect usage data and metrics to help improve your services
     providers=[
-        SDXLProvider(),  # Generation
-        FluxProvider()   # Enhancement
+        kp.ConcurrentQueue(
+            queue=64, 
+            provider=SDXLProvider(),                                               # Generation
+            streams=[ kp.LoadBalancingQueue(2, 'round-robin', FluxProvider()) ]    # Enhancement (using load balancing)
+        ),        
     ]
 )
 
@@ -186,28 +169,13 @@ async for id, result in pipeline.process_requests():
         print(f"Process: {metrics.provider_processing_time}ms")
 ```
 
-## Start Building
-
-```bash
-pip install kirigen-pipelines
-```
-
-## Real Performance
-
-Production metrics:
-- **Processing**: 150-300ms average
-- **Queue Time**: ~50ms typical
-- **Scaling**: 2x with auto-scale
-- **Memory**: 40% optimization
-- **Uptime**: 99.9% reliable
-
 ## Join Our Community
 
 <div align="center">
 
 [![Join Discord](https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kirigen)
-[![View Examples](https://img.shields.io/badge/View-Examples-FF4B4B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kirigen/pipelines/examples)
-[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://docs.kirigen.co/getting-started)
+[![View Examples](https://img.shields.io/badge/View-Examples-FF4B4B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kirigen-ai/pipelines/examples)
+[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kirigen.co/docs/en-us/getting-started)
 
 </div>
 
@@ -219,7 +187,7 @@ We build the orchestration layer that makes cognitive systems reliable. Open sou
 
 ---
 
-[![Star History](https://img.shields.io/github/stars/kirigen/pipelines?style=social)](https://github.com/kirigen/pipelines/stargazers)
+[![Star History](https://img.shields.io/github/stars/kirigen-ai/pipelines?style=social)](https://github.com/kirigen-ai/pipelines/stargazers)
 
 Built with 💜 by [Kirigen](https://kirigen.co) and the open source community.
 
