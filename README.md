@@ -43,16 +43,17 @@ Receive technical deep-dives
 ```python
 from kirigen.pipelines import AudioProviderPipeline, ImageProviderPipeline
 from kirigen.providers.imagination import SDXLProvider, FluxProvider
+import kirigen.pipelines as kp
 
 # Create your processing pipeline
 pipeline = ImageProviderPipeline(
     instances=1,                    # start with 1
-    scale_policy="never",           # scale on concurrency
-    scale_to_zero=False,            # disable to_zero scaling, leaving this pipeline always active
+    scale_policy="never",           # never scale
+    scale_to_zero=False,            # keep this pipeline always active
     providers=[
         kp.ConcurrentQueue(
             queue=4,
-            provider=SDXLProvider(),                                                # Generation
+            provider=SDXLProvider(),                                             # Generation
             streams=[ kp.LoadBalancingQueue(2, 'round-robin', FluxProvider()) ]  # Enhancement (using load balancing)
         ),
     ]
@@ -73,10 +74,10 @@ async for request_id, result in pipeline.process_requests():
 ```python
 @dataclass
 class PipelineRequestMetrics:
-    start_time: float              # Request received
-    queue_time: float             # Time in queue
+    start_time: float               # Request received
+    queue_time: float               # Time in queue
     provider_processing_time: float # Processing time
-    total_processing_time: float   # End-to-end time
+    total_processing_time: float    # End-to-end time
     
     def complete(self):
         self.total_processing_time = time.time() - self.start_time
@@ -143,7 +144,7 @@ pipeline = ImageProviderPipeline(
     max_instances=1,                # never scale
     cooldown=900,                   # 15-min cooldown
     device="cuda:0",                # specify the device to load this pipeline on
-    scale_policy="never",           # scale on concurrency
+    scale_policy="never",           # never scale
     scale_to_zero=False,            # disable to_zero scaling, leaving this pipeline always active
     enable_realtime=False,          # disable real-time streaming
     enable_telemetry=True,          # collect usage data and metrics to help improve your services
@@ -181,7 +182,13 @@ async for id, result in pipeline.process_requests():
 
 ## About Kirigen
 
-We build the orchestration layer that makes cognitive systems reliable. Open source, observable, and built for production.
+At Kirigen, we're tackling one of AI's most critical challenges: making advanced cognitive systems reliable and production-ready at scale. While AI models have advanced dramatically, the infrastructure to deploy them reliably remains complex and fragmented. We're open sourcing our tech because we believe that: 
+
+1. Shared knowledge amplifies AI's positive impact on society
+2. Community-driven development creates better solutions faster
+3. Transparent tools lead to more reliable systems
+
+Our mission is to provide the foundational infrastructure that transforms experimental AI into dependable, cognitive-ai. By open sourcing Kirigen, we're making orchestration accessible to everyone, from individual developers to large organizations.
 
 <div align="center">
 
