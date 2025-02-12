@@ -90,7 +90,7 @@ async def main():
         # check for streaming capabilities
         if request.enable_streaming():
             if not request.is_complete(): pipeline.stream_response(response)
-            else: pipeline_complete_request(response)
+            else: pipeline.complete_request(response)
 
         # otherwise complete the request (if applicable)
         elif request.is_complete(): 
