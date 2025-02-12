@@ -1,57 +1,32 @@
 # 🚀 Pipelines
-
-<div align="center">
-
-[![PyPI version](https://badge.fury.io/py/kirigen-pipelines.svg)](https://badge.fury.io/py/kirigen-pipelines)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-success.svg)](https://kirigen.co)
-[![Downloads](https://img.shields.io/pypi/dm/kirigen-pipelines)](https://pypi.org/project/kirigen-pipelines)
-[![Discord](https://img.shields.io/discord/1234567890?label=Join%20Community&color=5865F2)](https://discord.gg/kirigen)
-
-<br/>
+<div align="center"><br/>
 
 ### ⚠️ Early Access Alpha Release
-Pipelines is currently in active development. While core features are production-tested, we're rapidly adding new capabilities:
-Advanced provider management
-Extended metrics and monitoring
-Enhanced scaling capabilities
-New provider types
-
-**[Join our developer community](https://kirigen.co/newsletter)** to:
-Get notified when v1.0 launches
-Access early feature previews
-Shape the future of cognitive orchestration
-Receive technical deep-dives
-
+Pipelines is currently in active development. While the core features are currently being production-tested, the change from a closed source to an open source project is still in progress. We are actively working on refactoring our platform using the new open source codebase. We are also working on improving the documentation and examples to help you get started quickly.
 *Current Version: 0.1.0-alpha*
 
-**The engine that makes cognitive systems reliable.**
+[![PyPI version](https://badge.fury.io/py/kirigen-pipelines.svg)](https://badge.fury.io/py/kirigen-pipelines) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Production Ready](https://img.shields.io/badge/Soon-blue?style=flat&label=Production
+)](https://kirigen.co) [![Downloads](https://img.shields.io/pypi/dm/kirigen-pipelines)](https://pypi.org/project/kirigen-pipelines)
+[![Discord](https://img.shields.io/badge/Coming_Soon-orange?style=flat&label=Community
+)](https://discord.gg/kirigen)
 
-[Quick Start](https://docs.kirigen.co/quick-start) •
-[Documentation](https://docs.kirigen.co) •
-[Examples](https://github.com/kirigen/pipelines/examples) •
-[Discord](https://discord.gg/kirigen)
-
-<br/>
-
-<img src="https://kirigen.co/pipeline-demo.gif" alt="Pipelines in action" width="600px" />
-
-</div>
+[Quick Start](https://docs.kirigen.co/pipelines/quick-start) • [Documentation](https://docs.kirigen.co/pipelines/getting-started) • [Examples](https://github.com/kirigen/pipelines/examples) • [Newsletter](https://kirigen.co/latest-news)
+<br/></div>
 
 ## Production-Grade Orchestration
 
 ```python
 from kirigen import pipelines as kp
-from kirigen.providers.audio import SpeechSynthesisProvider, SpeechRecognitionProvider
-from kirigen.pipelines import BasePipelineFlow, ScalingPolicy, BalancingPolicy, PipelineRequestMetrics
-from kirigen.pipelines.requests import (
-    SpeechSynthesisRequest,
-    SpeechRecognitionRequest,     
+from kirigen.pipelines.audio import (
+    SpeechSynthesisProvider, SpeechSynthesisRequest, SpeechSynthesisResult,
+    SpeechRecognitionProvider, SpeechRecognitionRequest, SpeechRecognitionResult
 )
+from kirigen.pipelines.types import ScalingPolicy, BalancingPolicy
+from kirigen.pipelines.metrics import PipelineRequestMetrics
 
 async def main():
     # Create a generic speech pipeline
-    pipeline = BasePipelineFlow(    
+    pipeline = kp.Pipeline( 
         instances=1,                                    # initial number of instances
         max_instances=1,                                # disable horizontal scaling
         cooldown=300,                                   # 5-min cooldown
@@ -72,19 +47,23 @@ async def main():
                 policy=BalancingPolicy.FIFO,            # the policy used when processing requests
                 provider=SpeechRecognitionProvider(),   # the provider to use
                 streams=None                            # child flows used during the request processing
-            ),
-        ]
-    )
+            ), 
+        ] 
+    ) 
 
     # add speech generation request
-    sythn_request = pipeline.add_request( SpeechSynthesisRequest( text="Hello, world!", voice="default" ) )
+    synth_request = pipeline.add_request( SpeechSynthesisRequest( text="Hello, world!", target="default" ) )
+    synth_result: SpeechSynthesisResult = None
 
     # add speech recognition request
-    rec_request = pipeline.add_request( SpeechRecognitionRequest( file="voice-actor_take_001.wav" ) )
+    rec_request = pipeline.add_request( SpeechRecognitionRequest( uri="file://./voice-actor_take_001.wav", timecodes=True ) )
+    rec_result: SpeechRecognitionResult = None
 
     # process requests in the pipeline
-    while not(sythn_request.is_complete() and rec_request.is_complete()):        
+    while not(synth_request.is_complete() and rec_request.is_complete()):        
         async for request, response in await pipeline.process_requests():
+
+            # check for telemetry capabilities and print metrics if available
             with pipeline.request_metrics(request.id) as metrics:
                 if isinstance(metrics, PipelineRequestMetrics):
                     print(f"Request {request.id}:")
@@ -103,7 +82,9 @@ async def main():
 
 ## About Kirigen
 
-At Kirigen, we're tackling one of AI's most critical challenges: making advanced cognitive systems reliable and production-ready at scale. While AI models have advanced dramatically, the infrastructure to deploy them reliably remains complex and fragmented. We're open sourcing our tech because we believe that: 
+At Kirigen, we're tackling some of AI's most critical challenges: making advanced cognitive systems reliable and production-ready at scale. 
+
+While AI models have advanced dramatically, the infrastructure to deploy them reliably remains complex and fragmented. We're open sourcing our tech because we believe that: 
 
 1. Shared knowledge amplifies AI's positive impact on society
 2. Community-driven development creates better solutions faster
@@ -119,7 +100,7 @@ Our mission is to provide foundational cognitive systems that transforms experim
 
 [![Join Discord](https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kirigen)
 [![View Examples](https://img.shields.io/badge/View-Examples-FF4B4B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kirigen-ai/pipelines/examples)
-[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kirigen.co/docs/en-us/getting-started)
+[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://docs.kirigen.co/pipelines/getting-started)
 
 </div>
 
