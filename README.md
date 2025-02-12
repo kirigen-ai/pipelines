@@ -89,12 +89,12 @@ async def main():
 
         # check for streaming capabilities
         if request.enable_streaming():
-            if not request.is_complete(): pipeline.stream_response(response)
+            if not request.is_complete(): pipeline.stream_response(request, response)
             else: pipeline.complete_request(response)
 
         # otherwise complete the request (if applicable)
         elif request.is_complete(): 
-            pipline.complete_request(response)
+            pipline.complete_request(request, response)
 ```
 
 ## Things That Matter
