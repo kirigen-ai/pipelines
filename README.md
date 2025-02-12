@@ -97,35 +97,6 @@ async def main():
             pipline.complete_request(request, response)
 ```
 
-## Things That Matter
-
-### 📊 Observability
-```python
-
-class PipelineRequestMetrics(BaseModel):
-    start_time: float               # Request received
-    queue_time: float               # Time in queue
-    provider_processing_time: float # Processing time
-    total_processing_time: float    # End-to-end time
-    
-    def complete(self):
-        self.total_processing_time = time.time() - self.start_time
-
-class ImagePipelineRequestMetrics(PipelineRequestMetrics):
-    provider_name: str          # name of the provider
-    num_steps: int              # number of steps taken to generate the image
-    image_format: str           # format of the image
-    image_size: tuple           # size of the image
-    image_orientation: str      # orientation of the image
-    image_aspect_ratio: float   # aspect ratio of the image
-    metadata: dict[str, str]    # image metadata
-
-class StoragePipelineRequestMetrics(PipelineRequestMetrics):    
-    provider_name: str                      # name of the provider    
-    operations: Dict[str, int]              # operations performed by the provider
-    avg_operation_time: Dict[str, float]    # average time per operation
-```
-
 ## About Kirigen
 
 At Kirigen, we're tackling one of AI's most critical challenges: making advanced cognitive systems reliable and production-ready at scale. While AI models have advanced dramatically, the infrastructure to deploy them reliably remains complex and fragmented. We're open sourcing our tech because we believe that: 
