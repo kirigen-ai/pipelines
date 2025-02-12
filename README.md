@@ -126,47 +126,6 @@ class StoragePipelineRequestMetrics(PipelineRequestMetrics):
     avg_operation_time: Dict[str, float]    # average time per operation
 ```
 
-## Ready-to-Use Pipelines
-
-### Speech Processing
-```python
-# Create a generic speech pipeline
-pipeline = AudioProviderPipeline(    
-    instances=1,                                    # initial number of instances
-    max_instances=1,                                # disable horizontal scaling
-    cooldown=300,                                   # 5-min cooldown 
-    scale_policy=ScalingPolicy.CONCURRENT,          # scale on concurrency 
-    scale_to_zero=True,                             # allow this pipeline to reduce resources when not in use
-    enable_telemetry=True,                          # collect usage data and metrics to help improve your services
-    streams=[
-        kp.ConcurrentFlow(
-            max_requests=64,                        # Maximum number of requests stored in the processing queue
-            name='synthesis',                       # The name of the provider stream
-            policy=BalancingPolicy.FIFO,            # the policy used when processing requests
-            provider=SpeechSynthesisProvider(),     # the provider to use
-            streams=None                            # child flows used during the request processing
-        ),
-        kp.ConcurrentFlow(
-            max_requests=64,                        # Maximum number of requests stored in the processing queue
-            name='recognition',                     # The name of the provider stream
-            policy=BalancingPolicy.FIFO,            # the policy used when processing requests
-            provider=SpeechRecognitionProvider(),   # the provider to use
-            streams=None                            # child flows used during the request processing
-        ),
-    ]
-)
-```
-
-## Join Our Community
-
-<div align="center">
-
-[![Join Discord](https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kirigen)
-[![View Examples](https://img.shields.io/badge/View-Examples-FF4B4B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kirigen-ai/pipelines/examples)
-[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kirigen.co/docs/en-us/getting-started)
-
-</div>
-
 ## About Kirigen
 
 At Kirigen, we're tackling one of AI's most critical challenges: making advanced cognitive systems reliable and production-ready at scale. While AI models have advanced dramatically, the infrastructure to deploy them reliably remains complex and fragmented. We're open sourcing our tech because we believe that: 
@@ -178,6 +137,16 @@ At Kirigen, we're tackling one of AI's most critical challenges: making advanced
 Our mission is to provide foundational cognitive systems that transforms experimental AI into dependable, cognitive-ai. By open sourcing pipelines, we're making orchestration accessible to everyone, from individual developers to large organizations.
 
 <div align="center">
+
+## Join Our Community
+
+<div align="center">
+
+[![Join Discord](https://img.shields.io/badge/Join-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kirigen)
+[![View Examples](https://img.shields.io/badge/View-Examples-FF4B4B?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kirigen-ai/pipelines/examples)
+[![Read Docs](https://img.shields.io/badge/Read-Docs-0076D6?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kirigen.co/docs/en-us/getting-started)
+
+</div>
 
 ---
 
