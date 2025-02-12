@@ -45,7 +45,7 @@ async def main():
             kp.SequentialFlow(
                 max_requests=64,                        # Maximum number of requests stored in the processing queue
                 name='recognition',                     # The name of the provider stream
-                policy=BalancingPolicy.FIFO,            # the policy used when processing requests
+                policy=BalancingPolicy.PRIORITY,        # the policy used when processing requests
                 provider=SpeechRecognitionProvider(),   # the provider to use
                 streams=None                            # child flows used during the request processing
             ), 
