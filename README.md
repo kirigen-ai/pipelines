@@ -41,39 +41,66 @@ Receive technical deep-dives
 ## Production-Grade Orchestration
 
 ```python
-from kirigen.pipelines import AudioProviderPipeline, ImageProviderPipeline
-from kirigen.providers.imagination import SDXLProvider, FluxProvider
+from kirigen.pipelines import AudioProviderPipeline, ImageProviderPipeline, PipelineRequestMetrics
+from kirigen.providers.audio import SpeechSynthesisProvider, SpeechRecognitionProvider
 import kirigen.pipelines as kp
 
-# Create your processing pipeline
-pipeline = ImageProviderPipeline(
-    instances=1,                    # start with 1
-    scale_policy="never",           # never scale
-    scale_to_zero=False,            # keep this pipeline always active
-    providers=[
-        kp.ConcurrentQueue(
-            queue=4,
-            provider=SDXLProvider(),                                             # Generation
-            streams=[ kp.LoadBalancingQueue(2, 'round-robin', FluxProvider()) ]  # Enhancement (using load balancing)
-        ),
-    ]
-)
+async def main():
+    # Create a generic speech pipeline
+    pipeline = AudioProviderPipeline(    
+        instances=1,                                    # initial number of instances
+        max_instances=1,                                # disable horizontal scaling
+        cooldown=300,                                   # 5-min cooldown 
+        scale_policy=ScalingPolicy.CONCURRENT,          # scale on concurrency 
+        scale_to_zero=True,                             # allow this pipeline to reduce resources when not in use
+        enable_telemetry=True,                          # collect usage data and metrics to help improve your services
+        streams=[
+            kp.ConcurrentFlow(
+                max_requests=64,                        # Maximum number of requests stored in the processing queue
+                name='synthesis',                       # The name of the provider stream
+                policy=BalancingPolicy.FIFO,            # the policy used when processing requests
+                provider=SpeechSynthesisProvider(),     # the provider to use
+                streams=None                            # child flows used during the request processing
+            ),
+            kp.ConcurrentFlow(
+                max_requests=64,                        # Maximum number of requests stored in the processing queue
+                name='recognition',                     # The name of the provider stream
+                policy=BalancingPolicy.FIFO,            # the policy used when processing requests
+                provider=SpeechRecognitionProvider(),   # the provider to use
+                streams=None                            # child flows used during the request processing
+            ),
+        ]
+    )
 
-# Process with full observability
-async for request_id, result in pipeline.process_requests():
-    metrics = pipeline.request_metrics[request_id]
-    print(f"Request {request_id}:")
-    print(f"├─ Queue: {metrics.queue_time}ms")
-    print(f"├─ Process: {metrics.provider_processing_time}ms")
-    print(f"└─ Total: {metrics.total_processing_time}ms")
+    # add speech recognition request
+    pipeline.add_request( SpeechRecognitionRequest(file="voice-actor_take_001.wav") )
+
+    # add speech generation request
+    pipeline.add_request( SpeechGenerationRequest( text="Hello, world!", voice="default" ) )
+
+    # Monitor performance
+    async for request, response in pipeline.process_requests():
+        with pipeline.request_metrics(request.id) as metrics:
+            if isinstance(metrics, PipelineRequestMetrics):
+                print(f"Request {request.id}:")
+                print(f"├─ Queue: {metrics.queue_time}ms")
+                print(f"├─ Process: {metrics.provider_processing_time}ms")
+                print(f"└─ Total: {metrics.total_processing_time}ms")
+
+            if request.enable_streaming():
+                if not request.is_complete(): pipeline.stream_response(response)
+                else: pipeline_complete_request(response)
+            
+            elif request.is_complete(): 
+                pipline.complete_request(response)
 ```
 
 ## Things That Matter
 
-### 📊 Complete Observability
+### 📊 Observability
 ```python
-@dataclass
-class PipelineRequestMetrics:
+
+class PipelineRequestMetrics(BaseModel):
     start_time: float               # Request received
     queue_time: float               # Time in queue
     provider_processing_time: float # Processing time
@@ -82,92 +109,50 @@ class PipelineRequestMetrics:
     def complete(self):
         self.total_processing_time = time.time() - self.start_time
 
-@dataclass
 class ImagePipelineRequestMetrics(PipelineRequestMetrics):
-    num_steps: int              # number of steps in the pipeline
+    provider_name: str          # name of the provider
+    num_steps: int              # number of steps taken to generate the image
     image_format: str           # format of the image
     image_size: tuple           # size of the image
     image_orientation: str      # orientation of the image
     image_aspect_ratio: float   # aspect ratio of the image
-    provider_name: str          # name of the provider
     metadata: dict[str, str]    # image metadata
+
+class StoragePipelineRequestMetrics(PipelineRequestMetrics):    
+    provider_name: str                      # name of the provider    
+    operations: Dict[str, int]              # operations performed by the provider
+    avg_operation_time: Dict[str, float]    # average time per operation
 ```
 
 ## Ready-to-Use Pipelines
 
 ### Speech Processing
 ```python
-# Create speech pipeline
-pipeline = AudioProviderPipeline(
-    instances=2,                    # start with 2
-    max_instances=12,               # scale to 12
-    cooldown=300,                   # 5-min cooldown
-    device="cuda:0",                # specify the device to load this pipeline on
-    scale_policy="concurrent",      # scale on concurrency
-    scale_to_zero=True,             # enable to_zero scaling, completely disabling this pipeline during low used
-    enable_realtime=True,           # enable real-time streaming of audio in- and out    
-    enable_telemetry=True,          # collect usage data and metrics to help improve your services
-    providers=[
-        kp.ConcurrentQueue(queue=4, provider=KokoroProvider(), streams=None),  # Synthesis
-        kp.ConcurrentQueue(queue=4, provider=WhisperProvider(), streams=None), # Recognition
+# Create a generic speech pipeline
+pipeline = AudioProviderPipeline(    
+    instances=1,                                    # initial number of instances
+    max_instances=1,                                # disable horizontal scaling
+    cooldown=300,                                   # 5-min cooldown 
+    scale_policy=ScalingPolicy.CONCURRENT,          # scale on concurrency 
+    scale_to_zero=True,                             # allow this pipeline to reduce resources when not in use
+    enable_telemetry=True,                          # collect usage data and metrics to help improve your services
+    streams=[
+        kp.ConcurrentFlow(
+            max_requests=64,                        # Maximum number of requests stored in the processing queue
+            name='synthesis',                       # The name of the provider stream
+            policy=BalancingPolicy.FIFO,            # the policy used when processing requests
+            provider=SpeechSynthesisProvider(),     # the provider to use
+            streams=None                            # child flows used during the request processing
+        ),
+        kp.ConcurrentFlow(
+            max_requests=64,                        # Maximum number of requests stored in the processing queue
+            name='recognition',                     # The name of the provider stream
+            policy=BalancingPolicy.FIFO,            # the policy used when processing requests
+            provider=SpeechRecognitionProvider(),   # the provider to use
+            streams=None                            # child flows used during the request processing
+        ),
     ]
 )
-
-# speech recognition request
-request_id = await pipeline.add_request(
-    SpeechRecognitionRequest(file="voice-actor_take_001.wav")
-)
-
-# Monitor performance
-async for id, result in pipeline.process_requests():
-    if id == request_id:        
-        metrics = pipeline.request_metrics[id]
-        print(f"Time: {metrics.total_processing_time}ms")        
-
-# speech generation request
-request_id await pipeline.add_request(
-    SpeechGenerationRequest(text="Hello, world!")
-)
-
-# Monitor performance
-async for id, result in pipeline.process_requests():
-    if id == request_id:        
-        metrics = pipeline.request_metrics[id]
-        print(f"Time: {metrics.total_processing_time}ms")
-```
-
-### Image Generation
-```python
-# Create image pipeline
-pipeline = ImageProviderPipeline(
-    instances=1,                    # start with 1
-    max_instances=1,                # never scale
-    cooldown=900,                   # 15-min cooldown
-    device="cuda:0",                # specify the device to load this pipeline on
-    scale_policy="never",           # never scale
-    scale_to_zero=False,            # disable to_zero scaling, leaving this pipeline always active
-    enable_realtime=False,          # disable real-time streaming
-    enable_telemetry=True,          # collect usage data and metrics to help improve your services
-    providers=[
-        kp.ConcurrentQueue(
-            queue=64, 
-            provider=SDXLProvider(),                                               # Generation
-            streams=[ kp.LoadBalancingQueue(2, 'round-robin', FluxProvider()) ]    # Enhancement (using load balancing)
-        ),        
-    ]
-)
-
-# Add request with tracking
-request_id = await pipeline.add_request(
-    ImageGenerationRequest(prompt="landscape")
-)
-
-# Monitor performance
-async for id, result in pipeline.process_requests():
-    if id == request_id:
-        metrics = pipeline.request_metrics[id]
-        print(f"Queue: {metrics.queue_time}ms")
-        print(f"Process: {metrics.provider_processing_time}ms")
 ```
 
 ## Join Our Community
