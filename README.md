@@ -41,19 +41,23 @@ Receive technical deep-dives
 ## Production-Grade Orchestration
 
 ```python
-from kirigen.pipelines import AudioProviderPipeline, ImageProviderPipeline, PipelineRequestMetrics
+from kirigen import pipelines as kp
 from kirigen.providers.audio import SpeechSynthesisProvider, SpeechRecognitionProvider
-import kirigen.pipelines as kp
+from kirigen.pipelines import BasePipelineFlow, ScalingPolicy, BalancingPolicy, PipelineRequestMetrics
+from kirigen.pipelines.requests import (
+    SpeechSynthesisRequest,
+    SpeechRecognitionRequest,     
+)
 
 async def main():
     # Create a generic speech pipeline
-    pipeline = AudioProviderPipeline(    
+    pipeline = BasePipelineFlow(    
         instances=1,                                    # initial number of instances
         max_instances=1,                                # disable horizontal scaling
-        cooldown=300,                                   # 5-min cooldown 
-        scale_policy=ScalingPolicy.CONCURRENT,          # scale on concurrency 
+        cooldown=300,                                   # 5-min cooldown
         scale_to_zero=True,                             # allow this pipeline to reduce resources when not in use
         enable_telemetry=True,                          # collect usage data and metrics to help improve your services
+        scale_policy=ScalingPolicy.NONE,                # disable scaling
         streams=[
             kp.ConcurrentFlow(
                 max_requests=64,                        # Maximum number of requests stored in the processing queue
@@ -72,29 +76,29 @@ async def main():
         ]
     )
 
-    # add speech recognition request
-    pipeline.add_request( SpeechRecognitionRequest(file="voice-actor_take_001.wav") )
-
     # add speech generation request
-    pipeline.add_request( SpeechGenerationRequest( text="Hello, world!", voice="default" ) )
+    sythn_request = pipeline.add_request( SpeechSynthesisRequest( text="Hello, world!", voice="default" ) )
 
-    # Monitor performance
-    async for request, response in pipeline.process_requests():
-        with pipeline.request_metrics(request.id) as metrics:
-            if isinstance(metrics, PipelineRequestMetrics):
-                print(f"Request {request.id}:")
-                print(f"├─ Queue: {metrics.queue_time}ms")
-                print(f"├─ Process: {metrics.provider_processing_time}ms")
-                print(f"└─ Total: {metrics.total_processing_time}ms")
+    # add speech recognition request
+    rec_request = pipeline.add_request( SpeechRecognitionRequest( file="voice-actor_take_001.wav" ) )
 
-        # check for streaming capabilities
-        if request.enable_streaming():
-            if not request.is_complete(): pipeline.stream_response(request, response)
-            else: pipeline.complete_request(response)
+    # process requests in the pipeline
+    while not(sythn_request.is_complete() and rec_request.is_complete()):        
+        async for request, response in await pipeline.process_requests():
+            with pipeline.request_metrics(request.id) as metrics:
+                if isinstance(metrics, PipelineRequestMetrics):
+                    print(f"Request {request.id}:")
+                    print(f"├─ Queue: {metrics.queue_time}ms")
+                    print(f"├─ Process: {metrics.provider_processing_time}ms")
+                    print(f"└─ Total: {metrics.total_processing_time}ms")
 
-        # otherwise complete the request (if applicable)
-        elif request.is_complete(): 
-            pipline.complete_request(request, response)
+            # check for streaming capabilities
+            if request.enable_streaming():
+                if not request.is_complete(): pipeline.stream_response(request, response)
+                else: pipeline.complete_request(response)
+
+            # otherwise complete the request (if applicable)
+            elif request.is_complete(): pipeline.complete_request(request, response)
 ```
 
 ## About Kirigen
