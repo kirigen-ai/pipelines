@@ -35,13 +35,14 @@ async def main():
         scale_policy=ScalingPolicy.NONE,                # disable scaling
         streams=[
             kp.ConcurrentFlow(
+                concurrency=4,                          # Maximum number of concurrent requests processed by the provider
                 max_requests=64,                        # Maximum number of requests stored in the processing queue
                 name='synthesis',                       # The name of the provider stream
                 policy=BalancingPolicy.FIFO,            # the policy used when processing requests
                 provider=SpeechSynthesisProvider(),     # the provider to use
                 streams=None                            # child flows used during the request processing
             ),
-            kp.ConcurrentFlow(
+            kp.SequentialFlow(
                 max_requests=64,                        # Maximum number of requests stored in the processing queue
                 name='recognition',                     # The name of the provider stream
                 policy=BalancingPolicy.FIFO,            # the policy used when processing requests
@@ -49,7 +50,7 @@ async def main():
                 streams=None                            # child flows used during the request processing
             ), 
         ] 
-    ) 
+    )  
 
     # add speech generation request
     synth_request = pipeline.add_request( SpeechSynthesisRequest( text="Hello, world!", target="default" ) )
