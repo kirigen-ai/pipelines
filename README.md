@@ -87,12 +87,14 @@ async def main():
                 print(f"├─ Process: {metrics.provider_processing_time}ms")
                 print(f"└─ Total: {metrics.total_processing_time}ms")
 
-            if request.enable_streaming():
-                if not request.is_complete(): pipeline.stream_response(response)
-                else: pipeline_complete_request(response)
-            
-            elif request.is_complete(): 
-                pipline.complete_request(response)
+        # check for streaming capabilities
+        if request.enable_streaming():
+            if not request.is_complete(): pipeline.stream_response(response)
+            else: pipeline_complete_request(response)
+
+        # otherwise complete the request (if applicable)
+        elif request.is_complete(): 
+            pipline.complete_request(response)
 ```
 
 ## Things That Matter
